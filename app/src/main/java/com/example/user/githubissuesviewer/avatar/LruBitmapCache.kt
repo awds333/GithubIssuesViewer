@@ -2,8 +2,6 @@ package com.example.user.githubissuesviewer.avatar
 
 import android.graphics.Bitmap
 import android.support.v4.util.LruCache
-import android.util.Log
-import com.example.user.githubissuesviewer.activity.MainActivity.Companion.MY_TAG
 
 object LruBitmapCache {
     private lateinit var mCache: LruCache<String, Bitmap>
@@ -21,7 +19,6 @@ object LruBitmapCache {
     fun putBitmap(key: String, value: Bitmap) {
         if (!hasBitmap(key))
             mCache.put(key, value)
-        Log.d(MY_TAG, hasBitmap(key).toString())
     }
 
     fun hasBitmap(key: String): Boolean {

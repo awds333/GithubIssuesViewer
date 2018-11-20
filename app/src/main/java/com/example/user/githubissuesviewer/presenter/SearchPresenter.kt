@@ -49,16 +49,17 @@ class SearchPresenter(
     }
 
     private fun getIssuesByRepo(repo: Repo) {
+        view.cleanAvatars()
         disposable.clear()
         disposable.add(
             requestHelper.getIssuesByRepo(repo)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
+                .repeat()
                 .subscribe({ list ->
                     view.hideExceptionView()
                     view.showProgressBar(false)
                     view.setIssuesList(list)
-                    view.cleanAvatars()
                     getImages(list)
                 }
                     , { e ->
@@ -68,18 +69,25 @@ class SearchPresenter(
                             view.setIssuesList(emptyList())
                         } else
                             view.displayNetworkException()
-                    })
+                    },{Log.d(MY_TAG, "Iss complet")})
         )
     }
 
     private fun getImages(issues: List<Issue>) {
-        disposable.add(avatarHelper.getAvatars(issues)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({
-                view.setAvatar(it.second,it.first)
-            }, { e ->
-                Log.d(MY_TAG, e.toString())
-            }))
+        disposable.add(
+            avatarHelper.getAvatars(issues)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe({
+                    issues.forEach { issue ->
+                        if (issue.user.avatar_url.equals(it.second))
+                            view.setAvatar(issues.indexOf(issue), it.first)
+                    }
+                }, { e ->
+                    Log.d(MY_TAG, e.toString())
+                }, {
+                    Log.d(MY_TAG, "Image complet")
+                })
+        )
     }
 }

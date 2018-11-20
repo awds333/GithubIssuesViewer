@@ -17,8 +17,7 @@ class RequestHelper {
     }
 
     fun getIssuesByRepo(repo: Repo): Observable<List<Issue>> {
-        return Observable.interval(10, TimeUnit.SECONDS)
-            .startWith(0)
+        return Observable.interval(0,10, TimeUnit.SECONDS)
             .flatMap { gitApi.getIssues(repo.owner.login, repo.name) }
             .timeout(15, TimeUnit.SECONDS)
             .doOnNext { Log .d(MY_TAG,"next") }

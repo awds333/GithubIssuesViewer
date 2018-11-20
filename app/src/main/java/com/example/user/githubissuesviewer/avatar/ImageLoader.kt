@@ -12,14 +12,16 @@ object ImageLoader {
 
     fun getImage(url: String): Observable<Bitmap> {
         return Observable.create {
-            val response = okClient.newCall(Request.Builder().url(url).build()).execute()
-            if (!it.isDisposed)
-                if (response.isSuccessful) {
-                    it.onNext(BitmapFactory.decodeStream(response.body()!!.byteStream()))
+            try {
+                val response = okClient.newCall(Request.Builder().url(url).build()).execute()
+                if (!it.isDisposed) {
+                    if (response.isSuccessful)
+                        it.onNext(BitmapFactory.decodeStream(response.body()!!.byteStream()))
                     it.onComplete()
-                } else {
-                    it.onError(IOException("RequestFailed"))
                 }
+            } catch (e:IOException) {
+                it.onComplete()
+            }
         }
     }
 }
