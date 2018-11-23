@@ -10,6 +10,7 @@ import io.reactivex.Observable
 import io.reactivex.functions.Function
 import io.reactivex.schedulers.Schedulers
 import org.json.JSONObject
+import retrofit2.HttpException
 import java.util.concurrent.TimeUnit
 
 fun Observable<String>.findReposByName(gitAPI: GithubAPI): Observable<Pair<JSONObject, Object?>> {
@@ -49,12 +50,17 @@ fun Observable<Pair<JSONObject, Object?>>.getIssuesByRepo(gitAPI: GithubAPI): Ob
                 Pair(message, it as Object)
             }
             .onErrorResumeNext(Function {
-                Log.d(MY_TAG, it.message)
+                Log.d(MY_TAG, it.javaClass.name)
                 var exceptionMessage = JSONObject()
                 when (it.javaClass) {
                     IndexOutOfBoundsException::class.java -> {
                         exceptionMessage.put("type", Types.ISSUES)
                         Observable.just(Pair(exceptionMessage, emptyArray<Issue>() as Object))
+                    }
+                    HttpException::class.java->{
+                        exceptionMessage.put("type", Types.EXCEPTION)
+                        exceptionMessage.put("species", Exceptions.DDOS)
+                        Observable.just(Pair(exceptionMessage, it as Object))
                     }
                     else -> {
                         exceptionMessage.put("type", Types.EXCEPTION)

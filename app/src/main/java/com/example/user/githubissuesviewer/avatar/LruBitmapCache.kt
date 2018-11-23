@@ -8,7 +8,7 @@ object LruBitmapCache {
 
     init {
         var size = (Runtime.getRuntime().freeMemory()).toInt()
-        mCache = LruCache(size/4)
+        mCache = LruCache(size / 4)
     }
 
     fun getBitmap(key: String): Bitmap {
@@ -16,16 +16,18 @@ object LruBitmapCache {
         return mCache.get(key)!!
     }
 
+    @Synchronized
     fun putBitmap(key: String, value: Bitmap) {
         if (!hasBitmap(key))
             mCache.put(key, value)
     }
 
+    @Synchronized
     fun hasBitmap(key: String): Boolean {
         return mCache.get(key) != null
     }
 
-    fun clean(key: String){
+    fun clean(key: String) {
         mCache.remove(key)
         mCache.evictAll()
     }

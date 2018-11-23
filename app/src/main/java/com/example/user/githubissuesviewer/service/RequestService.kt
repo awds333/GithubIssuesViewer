@@ -13,6 +13,7 @@ import com.example.user.githubissuesviewer.retrofit.RetrofitClient
 import com.example.user.githubissuesviewer.retrofit.findReposByName
 import com.example.user.githubissuesviewer.retrofit.getIssuesByRepo
 import io.reactivex.Observable
+import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.functions.BiFunction
 import io.reactivex.observables.ConnectableObservable
 import io.reactivex.subjects.ReplaySubject
@@ -26,6 +27,8 @@ class RequestService : Service(), HttpHandler {
     private lateinit var issuesObservable: ConnectableObservable<Pair<JSONObject, Object?>>
     private lateinit var nameObservable: ConnectableObservable<String>
     private lateinit var avatarObservable: ConnectableObservable<Pair<JSONObject, Object?>>
+
+    private var disposable = CompositeDisposable()
 
     private var bungSubject: ReplaySubject<Pair<JSONObject, Object?>> = ReplaySubject.create()
 
@@ -66,10 +69,10 @@ class RequestService : Service(), HttpHandler {
     }
 
     override fun connect() {
-        avatarObservable.connect()
-        issuesObservable.connect()
-        repoObservable.connect()
-        nameObservable.connect()
+        disposable.add(avatarObservable.connect())
+        disposable.add(issuesObservable.connect())
+        disposable.add(repoObservable.connect())
+        disposable.add(nameObservable.connect())
     }
 
     override fun saveMessages() {
@@ -85,6 +88,7 @@ class RequestService : Service(), HttpHandler {
     }
 
     fun dispose() {
+        disposable.clear()
         bungSubject.onComplete()
     }
 }

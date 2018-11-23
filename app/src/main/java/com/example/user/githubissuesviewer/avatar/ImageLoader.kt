@@ -15,9 +15,11 @@ object ImageLoader {
             try {
                 val response = okClient.newCall(Request.Builder().url(url).build()).execute()
                 if (!it.isDisposed) {
-                    if (response.isSuccessful)
-                        if (response.body()!!.byteStream() != null)
-                            it.onNext(BitmapFactory.decodeStream(response.body()!!.byteStream()))
+                    if (!response.isRedirect) {
+                        var bitmap: Bitmap? = BitmapFactory.decodeStream(response.body()!!.byteStream())
+                        if (bitmap != null)
+                            it.onNext(bitmap)
+                    }
                     it.onComplete()
                 }
             } catch (e: IOException) {

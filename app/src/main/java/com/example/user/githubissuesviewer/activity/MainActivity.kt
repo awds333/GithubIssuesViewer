@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
 import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
@@ -28,6 +29,8 @@ class MainActivity : AppCompatActivity(), SearchView, View.OnClickListener, Serv
     private lateinit var presenter: SearchPresenter
     var issueList: List<Issue> = emptyList()
     private var terminalClosing = true
+    private var buttonEnabled = true
+    private val handler = Handler()
 
     override fun onServiceDisconnected(name: ComponentName?) {
         if (!isFinishing) {
@@ -118,7 +121,12 @@ class MainActivity : AppCompatActivity(), SearchView, View.OnClickListener, Serv
     }
 
     override fun onClick(v: View?) {
-        presenter.searchForRepository()
+        if (buttonEnabled) {
+            buttonEnabled = false
+            presenter.searchForRepository()
+            handler.postDelayed({ buttonEnabled = true }, 1500)
+        }
+
     }
 
     override fun hideExceptionView() {
