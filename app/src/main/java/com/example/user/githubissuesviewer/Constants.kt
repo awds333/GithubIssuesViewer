@@ -13,6 +13,5 @@ class Exceptions(){
     companion object {
         const val NETWORK_EXCEPTION : Int = 0
         const val SEARCH_EXCEPTION : Int = 1
-        const val DDOS : Int = 2
     }
 }
