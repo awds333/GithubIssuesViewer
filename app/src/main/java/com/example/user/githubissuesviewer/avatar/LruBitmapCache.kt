@@ -25,7 +25,8 @@ object LruBitmapCache {
         return mCache.get(key) != null
     }
 
-    fun clean(){
+    fun clean(key: String){
+        mCache.remove(key)
         mCache.evictAll()
     }
 }

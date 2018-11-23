@@ -10,4 +10,5 @@ class IssueViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     val img_avatar =  itemView.avatar
     val txt_title = itemView.title
     val txt_comments_count = itemView.comments_count
+    val txt_state = itemView.state
 }

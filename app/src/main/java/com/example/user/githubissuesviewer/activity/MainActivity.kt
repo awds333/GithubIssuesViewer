@@ -1,39 +1,56 @@
 package com.example.user.githubissuesviewer.activity
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.os.IBinder
 import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
+import android.util.Log
 import android.view.View
 import com.example.user.githubissuesviewer.R
 import com.example.user.githubissuesviewer.adapter.IssueAdapter
 import com.example.user.githubissuesviewer.adapter.IssueViewHolder
-import com.example.user.githubissuesviewer.avatar.AvatarHelper
+import com.example.user.githubissuesviewer.avatar.LruBitmapCache
 import com.example.user.githubissuesviewer.model.Issue
 import com.example.user.githubissuesviewer.presenter.SearchPresenter
-import com.example.user.githubissuesviewer.retrofit.RequestHelper
+import com.example.user.githubissuesviewer.service.RequestService
 import com.example.user.githubissuesviewer.view.SearchView
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import io.reactivex.disposables.CompositeDisposable
 import kotlinx.android.synthetic.main.activity_main.*
 
-class MainActivity : AppCompatActivity(), SearchView, View.OnClickListener {
+class MainActivity : AppCompatActivity(), SearchView, View.OnClickListener, ServiceConnection {
 
-    companion object {
-        val MY_TAG = "my_tag"
-    }
-
-    private lateinit var disposable: CompositeDisposable
     private lateinit var presenter: SearchPresenter
     var issueList: List<Issue> = emptyList()
+    private var terminalClosing = true
+
+    override fun onServiceDisconnected(name: ComponentName?) {
+        if (!isFinishing) {
+            searchButton.isEnabled = false
+            bindService(Intent(this, RequestService::class.java), this, Context.BIND_AUTO_CREATE)
+        }
+    }
+
+    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+        presenter = SearchPresenter(this, (service as RequestService.MyBinder).getHttpHandler(), issueList)
+        searchButton.isEnabled = true
+        Log.d(MY_TAG, "service binded")
+    }
+
+    companion object {
+        const val MY_TAG = "my_tag"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        disposable = CompositeDisposable()
-        presenter = SearchPresenter(this, RequestHelper(), disposable, AvatarHelper())
         initViews()
+        bindService(Intent(this, RequestService::class.java), this, Context.BIND_AUTO_CREATE)
     }
 
     private fun initViews() {
@@ -43,15 +60,21 @@ class MainActivity : AppCompatActivity(), SearchView, View.OnClickListener {
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle?) {
-        if (savedInstanceState != null) {
-            issueList  = Gson().fromJson(savedInstanceState!!.getString("issues"),object :TypeToken<List<Issue>>(){}.type)
-            recycler.adapter = IssueAdapter(this,issueList)
-            recycler.scrollToPosition(savedInstanceState!!.getInt("position"))
-        }
+        name.setText(savedInstanceState!!.getString("name"))
+        supportActionBar!!.title = savedInstanceState!!.getString("title")
+        progressBar.visibility = savedInstanceState!!.getInt("progress_visible")
+        exceptionView.text = savedInstanceState!!.getString("exception_text")
+        exceptionView.visibility = savedInstanceState!!.getInt("exception_visible")
+        issueList =
+                Gson().fromJson(savedInstanceState!!.getString("issues"), object : TypeToken<List<Issue>>() {}.type)
+        recycler.adapter = IssueAdapter(this, issueList)
+        recycler.scrollToPosition(savedInstanceState!!.getInt("position"))
     }
 
     override fun onDestroy() {
-        disposable.dispose()
+        presenter.finish()
+        if (terminalClosing)
+            stopService(Intent(this, RequestService::class.java))
         super.onDestroy()
     }
 
@@ -86,8 +109,12 @@ class MainActivity : AppCompatActivity(), SearchView, View.OnClickListener {
     }
 
     override fun setIssuesList(issues: List<Issue>) {
+        var position = 0
+        if (issueList != emptyList<Issue>() && issues != emptyList<Issue>())
+            position = (recycler.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
         issueList = issues
         recycler.adapter = IssueAdapter(this, issues)
+        recycler.scrollToPosition(position)
     }
 
     override fun onClick(v: View?) {
@@ -100,17 +127,23 @@ class MainActivity : AppCompatActivity(), SearchView, View.OnClickListener {
 
     override fun onSaveInstanceState(outState: Bundle?) {
         super.onSaveInstanceState(outState)
+        terminalClosing = false
+        outState!!.putString("name", name.text.toString())
+        outState!!.putString("title", supportActionBar!!.title.toString())
+        outState!!.putInt("progress_visible", progressBar.visibility)
+        outState!!.putInt("exception_visible", exceptionView.visibility)
+        outState!!.putString("exception_text", exceptionView.text.toString())
         outState!!.putString("issues", Gson().toJson(issueList).toString())
         outState!!.putInt("position", (recycler.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition())
     }
 
     override fun setAvatar(position: Int, avatar: Bitmap) {
-        if(recycler.findViewHolderForAdapterPosition(position)!=null)
+        if (recycler.findViewHolderForAdapterPosition(position) != null)
             (recycler.findViewHolderForAdapterPosition(position) as IssueViewHolder)
                 .img_avatar.setImageBitmap(avatar)
     }
 
-    override fun cleanAvatars() {
-        android.R.drawable.ic_menu_crop
+    override fun cleanAvatars(key: String) {
+        LruBitmapCache.clean(key)
     }
 }

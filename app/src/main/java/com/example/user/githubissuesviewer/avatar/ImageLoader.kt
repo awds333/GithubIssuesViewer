@@ -16,10 +16,11 @@ object ImageLoader {
                 val response = okClient.newCall(Request.Builder().url(url).build()).execute()
                 if (!it.isDisposed) {
                     if (response.isSuccessful)
-                        it.onNext(BitmapFactory.decodeStream(response.body()!!.byteStream()))
+                        if (response.body()!!.byteStream() != null)
+                            it.onNext(BitmapFactory.decodeStream(response.body()!!.byteStream()))
                     it.onComplete()
                 }
-            } catch (e:IOException) {
+            } catch (e: IOException) {
                 it.onComplete()
             }
         }

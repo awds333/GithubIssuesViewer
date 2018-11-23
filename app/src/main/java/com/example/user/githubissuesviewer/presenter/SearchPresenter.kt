@@ -1,22 +1,25 @@
 package com.example.user.githubissuesviewer.presenter
 
+import android.graphics.Bitmap
 import android.util.Log
-import com.example.user.githubissuesviewer.activity.MainActivity.Companion.MY_TAG
-import com.example.user.githubissuesviewer.avatar.AvatarHelper
+import com.example.user.githubissuesviewer.Exceptions
+import com.example.user.githubissuesviewer.Types
+import com.example.user.githubissuesviewer.activity.MainActivity
 import com.example.user.githubissuesviewer.model.Issue
 import com.example.user.githubissuesviewer.model.Repo
-import com.example.user.githubissuesviewer.retrofit.RequestHelper
+import com.example.user.githubissuesviewer.service.HttpHandler
 import com.example.user.githubissuesviewer.view.SearchView
+import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.disposables.CompositeDisposable
-import io.reactivex.schedulers.Schedulers
+import io.reactivex.disposables.Disposable
+import org.json.JSONObject
 
 class SearchPresenter(
     private val view: SearchView,
-    private val requestHelper: RequestHelper,
-    private val disposable: CompositeDisposable,
-    private val avatarHelper: AvatarHelper
+    private val handler: HttpHandler,
+    private var issues: List<Issue>
 ) {
+    private var disposable: Disposable = subscribe(handler.getObservable())
 
     fun searchForRepository() {
         val name = view.getName()
@@ -25,69 +28,82 @@ class SearchPresenter(
             view.displayNameException()
             return
         }
-        disposable.clear()
+        if (!disposable.isDisposed)
+            disposable.dispose()
         view.showProgressBar(true)
-        disposable.add(
-            requestHelper.findReposByName(name.trim())
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe({ list ->
-                    if (list.isNotEmpty()) {
-                        view.displayRepoName(list[0].owner.login + "/" + list[0].name)
-                        getIssuesByRepo(list[0])
-                    } else {
-                        view.displaySearchException()
-                        view.showProgressBar(false)
-                    }
-                }
-                    , { e ->
-                        Log.d(MY_TAG, e.toString())
-                        view.showProgressBar(false)
-                        view.displayNetworkException()
-                    })
-        )
+        disposable = subscribe(handler.getRepo(name.trim()))
+        handler.connect()
     }
 
-    private fun getIssuesByRepo(repo: Repo) {
-        view.cleanAvatars()
-        disposable.clear()
-        disposable.add(
-            requestHelper.getIssuesByRepo(repo)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .repeat()
-                .subscribe({ list ->
-                    view.hideExceptionView()
-                    view.showProgressBar(false)
-                    view.setIssuesList(list)
-                    getImages(list)
-                }
-                    , { e ->
-                        Log.d(MY_TAG, e.toString())
+    private inline fun subscribe(observable: Observable<Pair<JSONObject, Object?>>): Disposable {
+        return observable.observeOn(AndroidSchedulers.mainThread())
+            .subscribe({
+                when (it.first.getInt("type")) {
+                    Types.REPO -> {
+                        val repo = (it.second as Repo)
+                        view.displayRepoName(repo.owner.login + "/" + repo.name)
+                        view.setIssuesList(emptyList())
+                        for (issue in issues)
+                            view.cleanAvatars(issue.user.avatar_url)
+                    }
+                    Types.ISSUES -> {
                         view.showProgressBar(false)
-                        if (e.javaClass == IndexOutOfBoundsException::class.java) {
-                            view.setIssuesList(emptyList())
-                        } else
-                            view.displayNetworkException()
-                    },{Log.d(MY_TAG, "Iss complet")})
-        )
+                        view.hideExceptionView()
+                        var list = it.second as List<Issue>
+                        if (!equals(list,issues)) {
+                            view.setIssuesList(it.second as List<Issue>)
+                            issues = it.second as List<Issue>
+                        }
+                    }
+                    Types.AVATAR -> {
+                        for (issue in issues)
+                            if (issue.user.avatar_url.equals(it.first.getString("url")))
+                                view.setAvatar(issues.indexOf(issue), it.second as Bitmap)
+                    }
+                    Types.EXCEPTION -> {
+                        when (it.first.getInt("species")) {
+                            Exceptions.NETWORK_EXCEPTION -> {
+                                view.showProgressBar(false)
+                                view.displayNetworkException()
+                            }
+                            Exceptions.SEARCH_EXCEPTION -> {
+                                view.showProgressBar(false)
+                                view.displaySearchException()
+                            }
+                        }
+                        Log.d(MainActivity.MY_TAG, "exception " + it.first.get("species"))
+                    }
+                }
+            }, {
+                Log.d(MainActivity.MY_TAG, "main failed!")
+            }, {
+                Log.d(MainActivity.MY_TAG, "main completed!")
+            })
     }
 
-    private fun getImages(issues: List<Issue>) {
-        disposable.add(
-            avatarHelper.getAvatars(issues)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe({
-                    issues.forEach { issue ->
-                        if (issue.user.avatar_url.equals(it.second))
-                            view.setAvatar(issues.indexOf(issue), it.first)
-                    }
-                }, { e ->
-                    Log.d(MY_TAG, e.toString())
-                }, {
-                    Log.d(MY_TAG, "Image complet")
-                })
-        )
+    fun equals(a: List<Issue>, b: List<Issue>): Boolean {
+        if(a.size!=b.size)
+            return false
+        for(i in 0 until a.size) {
+            if (a[i].title != b[i].title)
+                return false
+            else if (a[i].comments != b[i].comments)
+                return false
+            else if (a[i].number != b[i].number)
+                return false
+            else if (a[i].state != b[i].state)
+                return false
+            else if (a[i].user.login != b[i].user.login)
+                return false
+            else if (a[i].user.avatar_url != b[i].user.avatar_url)
+                return false
+        }
+        return true
+    }
+
+    fun finish() {
+        handler.saveMessages()
+        if (!disposable.isDisposed)
+            disposable.dispose()
     }
 }

@@ -5,4 +5,7 @@
     <string name="net_exception">Network request failed</string>
     <string name="name_exception">Enter repository name</string>
     <string name="search_exception">Repository not found</string>
+    <string name="by">by</string>
+    <string name="sharp">#</string>
+    <string name="closed">Closed</string>
 </resources>
